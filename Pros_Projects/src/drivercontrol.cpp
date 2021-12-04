@@ -1,6 +1,7 @@
   #include "main.h"
 
 
+
 void moveDrive(int left, int right) {
   driveLeftBack.move(left);
   driveLeftFront.move(left);
@@ -43,4 +44,39 @@ void setDriveMotorsArcade() {
   int right = power - turn;
   moveDrive(left, right);
 
+}
+void reset() {
+  driveLeftBack.tare_position();
+  driveRightBack.tare_position();
+  driveLeftFront.tare_position();
+  driveRightFront.tare_position();
+  moveDrive(0, 0);
+}
+
+
+
+
+// AUTONOMOUS FUNCTIONS
+
+void setBrakeMode(int modeNumber) {
+  //0 = COAST
+  //1 = BRAKE
+  //2 = HOLD
+  pros::motor_brake_mode_e_t brakeMode;
+
+  switch (modeNumber) {
+    case 0:
+      brakeMode = MOTOR_BRAKE_COAST;
+      break;
+    case 1:
+      brakeMode = MOTOR_BRAKE_BRAKE;
+      break;
+    case 2:
+      brakeMode = MOTOR_BRAKE_HOLD;
+      break;
+  }
+  driveLeftBack.set_brake_mode(brakeMode);
+  driveLeftFront.set_brake_mode(brakeMode);
+  driveRightBack.set_brake_mode(brakeMode);
+  driveRightFront.set_brake_mode(brakeMode);
 }
