@@ -55,8 +55,13 @@ void reset() {
 
 
 
+// Tasking
 
-// AUTONOMOUS FUNCTIONS
+
+
+
+
+// Drive Modifiers
 
 void setBrakeMode(int modeNumber) {
   //0 = COAST
