@@ -8,9 +8,8 @@ extern pros::Motor driveRightBack;
 extern pros::Motor driveRightFront;
 
 
-// Intake Motor
+// Intake Motors
 extern pros::Motor intake;
-extern pros::Motor conveyor;
 
 
 
