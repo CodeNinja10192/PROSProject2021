@@ -1,6 +1,8 @@
 #include "main.h"
 
+//Intake Control (OLD)
 
+/*
 void intakeHelper(int value) {
   intake.move(value);
 }
@@ -14,3 +16,6 @@ void setConveyorMotors() {
   conveyorHelper(-127);
 
 }
+*/
+
+// Intake Control (NEW)
