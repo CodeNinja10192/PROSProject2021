@@ -57,7 +57,12 @@ void reset() {
 
 // Tasking
 
-
+void driveTask(void* parameter) {
+  while (true) {
+    setDriveMotorsArcade();
+    pros::delay(20);
+  }
+}
 
 
 
@@ -84,4 +89,10 @@ void setBrakeMode(int modeNumber) {
   driveLeftFront.set_brake_mode(brakeMode);
   driveRightBack.set_brake_mode(brakeMode);
   driveRightFront.set_brake_mode(brakeMode);
+}
+
+
+
+void driveInit() {
+  pros::Task chassisTask(driveTask);
 }

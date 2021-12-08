@@ -6,3 +6,5 @@ void setDriveMotorsTank();
 void setDriveMotorsArcade();
 void reset();
 void setBrakeMode(int modeNumber);
+void driveTask(void* parameter);
+void driveInit();

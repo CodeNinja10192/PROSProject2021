@@ -74,14 +74,12 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
+	// Drive Control
+	driveInit();
+	// Intake + Conveyor Control
+	//setIntakeMotors();
+	//setConveyorMotors();
 	while(true) {
-		// Drive Control
-		setDriveMotorsArcade();
-		// Intake + Conveyor Control
-		setIntakeMotors();
-		setConveyorMotors();
-
-
 		pros::delay(20);
 	}
 }
