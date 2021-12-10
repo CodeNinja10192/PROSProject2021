@@ -12,6 +12,9 @@ extern pros::Motor driveRightFront;
 extern pros::Motor intake;
 
 
+// Lift Motors
+extern pros::Motor lift;
+
 
 
 

@@ -59,7 +59,7 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-	//driveAutonomousInit();
+	driveAutonomousInit();
 	while (true) {
 		pros::delay(20);
 	}
@@ -82,8 +82,7 @@ void opcontrol() {
 	// Drive Control
 	driveInit();
 	// Intake + Conveyor Control
-	//setIntakeMotors();
-	//setConveyorMotors();
+	intakeInit();
 	while(true) {
 		pros::delay(20);
 	}
