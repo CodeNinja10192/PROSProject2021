@@ -85,13 +85,13 @@ void opcontrol() {
 	// Intake + Conveyor Control
 	//intakeInit();
 	while(true) {
+		// Pneumatics Control
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
 			piston.set_value(true);
 		}
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
 			piston.set_value(false);
 		}
-
 		pros::delay(20);
 	}
 }
