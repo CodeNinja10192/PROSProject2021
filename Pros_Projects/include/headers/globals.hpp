@@ -15,9 +15,5 @@ extern pros::Motor intake;
 // Lift Motors
 extern pros::Motor lift;
 
-// Pneumatics
-extern pros::ADIDigitalOut piston;
-
-
 // Controller
 extern pros::Controller master;

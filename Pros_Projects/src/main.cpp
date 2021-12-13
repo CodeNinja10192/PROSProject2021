@@ -59,7 +59,7 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-	driveAutonomousInit();
+	//driveAutonomousInit();
 	while (true) {
 		pros::delay(20);
 	}
@@ -79,16 +79,19 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
+	pros::ADIDigitalOut piston('A');
 	// Drive Control
-	driveInit();
+	//driveInit();
 	// Intake + Conveyor Control
-	intakeInit();
+	//intakeInit();
 	while(true) {
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
 			piston.set_value(true);
-			pros::delay(1000);
+		}
+		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
 			piston.set_value(false);
 		}
+
 		pros::delay(20);
 	}
 }
