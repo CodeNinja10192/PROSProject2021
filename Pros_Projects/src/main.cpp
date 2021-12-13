@@ -81,17 +81,18 @@ void autonomous() {
 void opcontrol() {
 	pros::ADIDigitalOut piston('A');
 	// Drive Control
-	//driveInit();
+	driveInit();
 	// Intake + Conveyor Control
-	//intakeInit();
+	intakeInit();
+
+	/*
+	Pneumatics Test - 12/12
+	piston.set_value(true);
+	pros::delay(2000);
+	piston.set_value(false);
+	*/
+
 	while(true) {
-		// Pneumatics Control
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
-			piston.set_value(true);
-		}
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
-			piston.set_value(false);
-		}
 		pros::delay(20);
 	}
 }
