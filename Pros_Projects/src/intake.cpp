@@ -52,12 +52,10 @@ void intakeOpControl() {
 }
 
 void intakeTask(void* parameter) {
-  while (true) {
-    intakeOpControl();
-    pros::delay(20);
+  if (pros::competition::is_connected()) {
+    while (true) {
+      intakeOpControl();
+      pros::delay(20);
+    }
   }
-}
-
-void intakeInit() {
-  pros::Task conveyorTask(intakeTask);
 }

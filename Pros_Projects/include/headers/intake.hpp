@@ -20,4 +20,3 @@ void intakeRelativeMove(int degrees, int vel);
 void intakePower(int voltage);
 void intakeOpControl();
 void intakeTask(void* parameter);
-void intakeInit();

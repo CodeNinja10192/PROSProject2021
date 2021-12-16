@@ -23,7 +23,8 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::Task chassis_task(driveTask);
+	pros::Task chassis_Task(driveTask);
+	pros::Task intake_Task(intakeTask);
 
 }
 
@@ -77,10 +78,6 @@ void autonomous() {
  */
 void opcontrol() {
 	pros::ADIDigitalOut piston('A');
-	// Drive Control
-	// Intake + Conveyor Control
-	intakeInit();
-
 	/*
 	Pneumatics Test - 12/12
 	piston.set_value(true);
