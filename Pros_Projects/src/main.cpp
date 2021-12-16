@@ -23,10 +23,8 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+	pros::Task chassis_task(driveTask);
 
-	pros::lcd::register_btn1_cb(on_center_button);
 }
 
 /**
@@ -59,7 +57,6 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-	//driveAutonomousInit();
 	while (true) {
 		pros::delay(20);
 	}
@@ -81,7 +78,6 @@ void autonomous() {
 void opcontrol() {
 	pros::ADIDigitalOut piston('A');
 	// Drive Control
-	driveInit();
 	// Intake + Conveyor Control
 	intakeInit();
 

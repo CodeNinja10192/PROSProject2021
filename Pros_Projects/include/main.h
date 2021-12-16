@@ -45,6 +45,8 @@
 #include "headers/drivercontrol.hpp"
 #include "headers/intake.hpp"
 #include "headers/autons.hpp"
+#include "headers/lift.hpp"
+
 
 
 /**

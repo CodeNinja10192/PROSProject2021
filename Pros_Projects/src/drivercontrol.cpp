@@ -62,14 +62,13 @@ void reset() {
 
 // Tasking
 
+/*
 void driveTask(void* parameter) {
   while (true) {
     setDriveMotorsArcade();
     pros::delay(20);
   }
-
-
-  }
+}
 
 void drivePIDTask(void* parameter) {
 
@@ -97,7 +96,39 @@ void drivePIDTask(void* parameter) {
   }
 }
 
+*/
+void driveTask(void* parameter) {
+  if (pros::competition::is_autonomous()) {
+    int previousError = 0;
+    while (true) {
+      int sp = driveTarget;
 
+      double kP = 0.3;
+      double kI = 0.3;
+      double kD = 0.3;
+
+      int sv = driveLeftBack.get_position();
+
+      int error = sp - sv;
+      int integral = integral + error;
+      int derivative = error - previousError;
+
+      if (error == 0) {
+        integral = 0;
+      }
+      int power = (error * kP) + (integral * kI) + (derivative * kD);
+      previousError = error;
+      moveDrive(power, power);
+      pros::delay(20);
+    }
+  }
+  else if (pros::competition::is_connected()) {
+    while (true) {
+      setDriveMotorsArcade();
+      pros::delay(20);
+    }
+  }
+}
 
 
 // Drive Modifiers
@@ -123,15 +154,4 @@ void setBrakeMode(int modeNumber) {
   driveLeftFront.set_brake_mode(brakeMode);
   driveRightBack.set_brake_mode(brakeMode);
   driveRightFront.set_brake_mode(brakeMode);
-}
-
-
-
-void driveInit() {
-  pros::Task chassisTask(driveTask);
-}
-
-
-void driveAutonomousInit() {
-  pros::Task drivePID(drivePIDTask);
 }
