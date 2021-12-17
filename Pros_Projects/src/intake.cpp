@@ -21,20 +21,20 @@ void setConveyorMotors() {
 // Intake Control (NEW)
 
 void intakeIn() {
-  intake.move_voltage(12000);
+  intake.move(127);
 }
 void outTake() {
-  intake.move_voltage(-12000);
+  intake.move(-127);
 }
 void intakeStop() {
-  intake.move_voltage(0);
+  intake.move(0);
 }
 
 
 
 
-void intakeRelativeMove(int counts, int vel) {
-  intake.move_relative(counts, vel);
+void intakeRelativeMove(int degrees, int vel) {
+  intake.move_relative(degrees, vel);
 }
 void intakePower(int voltage) {
   intake.move_voltage(voltage);
