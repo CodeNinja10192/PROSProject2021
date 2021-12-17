@@ -20,6 +20,11 @@ void setConveyorMotors() {
 
 // Intake Control (NEW)
 
+// Autonomous: Intake target Setter
+
+
+
+// Basic Functions
 void intakeIn() {
   intake.move(127);
 }
