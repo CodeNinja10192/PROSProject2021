@@ -25,6 +25,7 @@ void on_center_button() {
 void initialize() {
 	pros::Task chassis_Task(driveTask);
 	pros::Task intake_Task(intakeTask);
+	pros::Task lift_Task(liftTask);
 
 }
 
