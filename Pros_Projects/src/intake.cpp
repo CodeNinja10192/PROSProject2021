@@ -35,6 +35,18 @@ void intakeStop() {
   intake.move(0);
 }
 
+// We don't have to use the next ones if they are not needed, but we can add them into controls if we do need them.
+
+void intakeInSlow() {
+  intake.move_velocity(100);
+}
+void intakeInMedium() {
+  intake.move_velocity(120);
+}
+void intakeOutSlow() {
+  intake.move_velocity(-100);
+}
+
 
 
 
@@ -63,6 +75,8 @@ void intakeTask(void* parameter) {
       pros::delay(20);
     }
   }
+
+  /*
   else if (pros::competition::is_autonomous()) {
     int previousError = 0;
     while (true) {
@@ -87,4 +101,5 @@ void intakeTask(void* parameter) {
       pros::delay(20);
     }
   }
+  */
 }

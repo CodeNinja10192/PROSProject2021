@@ -1,15 +1,21 @@
-#include "main.h"
-//Basic Functions
-double getLiftPosition();
-void liftPower(int voltage);
-void liftSlew(double liftTargetSpeed);
-void liftSetTarget(int target);
+#ifndef _LIFT_HPP_
+#define _LIFT_HPP_
 
-//Specific Lift Functions (Use for Op Control)
-void liftUp();
-void liftDown();
-void liftStop();
-void liftOpControl();
+void clamp(bool state);
 
-// Tasking and Init
-void liftTask(void* parameter);
+
+void setLiftTarget(double target);
+
+void liftPrintInfo();
+
+void clampPiston(bool val);
+
+void setLiftMode(int mode);
+
+void calcDelta();
+
+void liftTask(void *param);
+
+
+
+#endif

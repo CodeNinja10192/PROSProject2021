@@ -23,9 +23,10 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::Task chassis_Task(driveTask);
+	pros::Task chassis_Task(chassisTask);
 	pros::Task intake_Task(intakeTask);
 	pros::Task lift_Task(liftTask);
+	pros::Task fork_Task(forkTask);
 
 }
 

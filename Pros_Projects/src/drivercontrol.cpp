@@ -1,273 +1,1122 @@
 #include "main.h"
 
-double driveTarget = 0;
+
+static int chassisMode = 1; // 0 for op control; 1 for forward/backward; 2 for turn; 3 for point turn; 4 for arcs
+
+const double WHEELBASE_WIDTH = 13.25;
+const int WHEEL_DIAM = 4;
+const double DRIVE_RATIO = 84/60;
+const double PI = 3.14159265;
+
+int CHASSIS_MAX = 127;
+int TURN_MAX = 70;
+int POINT_MAX = 127;
+int ARC_MAX = 127;
+
+
+static int chassis_maxSpeed = CHASSIS_MAX;
+static int turn_maxSpeed = TURN_MAX;
+static int point_maxSpeed = POINT_MAX;
+static int arc_maxSpeed = ARC_MAX;
+
+double P = 0;
+double I = 0;
+double D = 0;
+
+
+
+const double CHASSIS_KP = 0.40;
+const double CHASSIS_KI = 0.01;
+const double CHASSIS_KD = 1.25;
+
+const double CHASSIS_ERROR_TRESH[] = {30, 7}; //1st bound starts timer, 2nd bound is for exit condition
+const double CHASSIS_DERIV_THRESH = 3; //derivative threshold
+const int CHASSIS_TIMEOUT[] = {1000, 200}; //max settling time
+
+const double CHASSIS_LOWER_INTEGRAL_BOUND = CHASSIS_ERROR_TRESH[1] + 3;
+const double CHASSIS_UPPER_INTEGRAL_BOUND = 60;
+const double CHASSIS_INTEGRAL_CAP = 0;
+
+
+int chassisAccelStep = 0;
+
+//left
 double leftTarget = 0;
+double leftPos = 0;
+
+double leftError = 0;
+double lastLeftError = 0;
+double leftDeriv = 0;
+double leftIntegral = 0;
+
+double leftPower = 0;
+double slewedLeftPower = 0;
+double lastSlewedLeftPower = 0;
+
+
+double leftLastDeriv = 0;
+
+int leftSettleTimer = 0;
+int leftExitTimer = 0;
+
+
+//right
 double rightTarget = 0;
+double rightPos = 0;
+double rightError = 0;
+
+double lastRightError = 0;
+double rightDeriv = 0;
+double rightIntegral = 0;
+
+double rightPower = 0;
+double slewedRightPower = 0;
+double lastSlewedRightPower = 0;
+
+
+double rightLastDeriv = 0;
+
+int rightSettleTimer = 0;
+int rightExitTimer = 0;
+
+
+/**************************************************/
+//turn
+
 double turnTarget = 0;
+double turnPos = 0;
 
-double driveSpeed = 0;
-int leftSpeed = 0;
-int rightSpeed = 0;
+double turnError = 0;
+double lastTurnError = 0;
+double turnDeriv = 0;
 
-int drive_acceleration = 4;
-int drive_deceleration = 256;
+double turnLastDeriv = 0;
+int turnElapsed = 0;
 
-bool isTurning = false;
+double turnPower = 0;
 
-double leftPreviousError = 0;
-double rightPreviousError = 0;
-double turnPreviousError = 0;
+double turnIntegral = 0;
 
-double maxSpeed = 127;
+const double TURN_KP = 0.9;
+const double TURN_KI = 0;
+const double TURN_KD = 3;
 
-void moveDrive(int left, int right) {
-  driveLeftBack.move(left);
-  driveLeftFront.move(left);
-  driveRightBack.move(right);
-  driveRightFront.move(right);
-}
-double getLeftPos() {
-  return driveLeftFront.get_position();
-}
-double getRightPos() {
-  return driveRightFront.get_position();
-}
+const double TURN_ERROR_MIN = 0;
 
+const double TURN_LOWER_INTEGRAL_BOUND = 0;
+const double TURN_UPPER_INTEGRAL_BOUND = 0;
+const double TURN_INTEGRAL_CAP = 0;
 
-void setDriveMotorsTank() {
-  int leftJoystick = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-  int rightJoystick = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+const int TURN_ERROR_TRESH[] = {15, 7};
+const double TURN_DERIV_THRESH = 2;
+const double TURN_TIMEOUT = 1000;
 
-  if (abs(leftJoystick) < 10) {
-    leftJoystick = 0;
-  }
-  if (abs(rightJoystick) < 10) {
-    rightJoystick = 0;
-  }
+int turnAccelStep = 0;
 
+/**************************************************/
+//point turns
+bool isPointTurnRight = true;
 
-  moveDrive(leftJoystick, rightJoystick);
-}
+/**************************************************/
+//arc
+double arcRatio = 0;
+bool isArcRight = true;
 
-// ARCADE CONTROL
-
-void setDriveMotorsArcade() {
-  int power = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-  int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-  if (abs(power) < 10) {
-    power = 0;
-  }
-  if (abs(turn) < 10) {
-    turn = 0;
-  }
-  int left = power + turn;
-  int right = power - turn;
-  moveDrive(left, right);
-
-}
-void reset() {
-  driveLeftBack.tare_position();
-  driveRightBack.tare_position();
-  driveLeftFront.tare_position();
-  driveRightFront.tare_position();
-  moveDrive(0, 0);
-}
+const double ARC_KP[] = {0, 0};
+const double ARC_KI[] = {0, 0};
+const double ARC_KD[] = {0, 0};
 
 
+/**************************************************/
+//slant
 
-// Slew Functions
+static double slantDiff = 0;
+double slantGains = 0;
+double lastSlantDiff = 0;
+double slantDeriv = 0;
 
-void driveSlew(double leftTarget, double rightTarget) {
-  int leftStep;
-  int rightStep;
+const double SLANT_KP = 0;
+const double SLANT_KD = 0;
 
-  // Left Slew
-  if ((abs(leftSpeed)) < abs(leftTarget)) {
-    leftStep = drive_acceleration;
-  }
-  else {
-    leftStep = drive_deceleration;
-  }
+const double SLANT_TURN_KP = 0;
+const double SLANT_TURN_KD = 0;
 
-  if (leftTarget > leftSpeed + leftStep) {
-    leftTarget += leftStep;
-  }
-  else if (leftTarget < leftSpeed - leftStep) {
-    leftSpeed -= leftStep;
-  }
-  else {
-    leftSpeed = leftTarget;
-  }
+const double SLANT_THRESH = 15;
 
-  // Right Slew
-  if ((abs(rightSpeed)) < abs(rightTarget)) {
-    rightStep = drive_acceleration;
-  }
-  else {
-    rightStep = drive_deceleration;
-  }
+double slantState = 0;
 
-  if (rightTarget > rightSpeed + rightStep) {
-    rightTarget += rightStep;
-  }
-  else if (rightTarget < rightSpeed - rightStep) {
-    rightSpeed -= rightStep;
-  }
-  else {
-    rightSpeed = rightTarget;
-  }
-  moveDrive(leftSpeed, rightSpeed);
+const double ARC_SLANT_KP = 0;
+const double ARC_SLANT_KD = 0;
+
+//*************************************************/
+//setters
+void setChassisMax(int power){
+    CHASSIS_MAX = power;
 }
 
-
-
-// Autonomous Functions
-
-void leftMoveAsync(double target) {
-  reset();
-  driveTarget = target;
-
-}
-void leftMove(double target) {
-  leftMoveAsync(target);
+void setTurnMax(int power){
+    TURN_MAX = power;
 }
 
-void rightMoveAsync(double target) {
-  reset();
-  rightTarget = target;
-}
-void rightMove(double target) {
-  rightMoveAsync(target);
-}
-void moveForward(double distance) {
-  leftMoveAsync(distance);
-  rightMoveAsync(distance);
-}
-void moveBackward(double distance) {
-  double backward_distance = -1 * distance;
-  moveForward(backward_distance);
-}
-void turnAsync(double target) {
-  reset();
-  turnTarget = target;
-  isTurning = true;
-}
-void turn(double target) {
-  turnAsync(target);
+void setChassisAccel(int step){
+    chassisAccelStep = step;
 }
 
-// Tasking
+void setTurnAccel(int step){
+    turnAccelStep = step;
+}
 
-void driveTask(void* parameter) {
-  reset();
-  // Turn PID Constants
-  double tP = 0.3;
-  double tI = 0.3;
-  double tD = 0.3;
-  // Drive PID Constants
-  double dP = 0.3;
-  double dI = 0.3;
-  double dD = 0.3;
-  while (true) {
-    if (!pros::competition::is_autonomous()) {
-      setDriveMotorsArcade();
+void setChassisMode(int mode){
+    chassisMode = mode;
+}
+/**************************************************/
+//basic functions
+
+int sgn(int value){
+    return abs(value) / value;
+}
+
+double sgn(double value){
+    return abs(value) / value;
+}
+
+double inchesToTicks(double inches)
+{
+	double revolutions = inches / (WHEEL_DIAM * PI);
+	return revolutions * 360 / DRIVE_RATIO;
+}
+
+double degreesToTicks(double degrees)
+{
+	double distance_inches = ( PI * WHEELBASE_WIDTH * degrees) / 360.0;
+	double revolutions = (distance_inches / (WHEEL_DIAM * PI));
+	return revolutions * 360 * 60 / 84;
+}
+
+/**************************************************/
+//basic control
+void left(int power){
+    left1.move(power);
+    left2.move(power);
+}
+
+void right(int power){
+    right1.move(power);
+    right2.move(power);
+}
+
+void lockLeft(){
+    left1.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    left2.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+}
+
+void lockRight(){
+    right1.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    right2.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+}
+
+void coastLeft(){
+    left1.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    left2.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+}
+
+void coastRight(){
+    right1.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    right2.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+}
+
+
+void reset(){
+    coastRight();
+    coastLeft();
+}
+
+double getRightPos(){
+    return right1.get_position();
+}
+
+double getLeftPos(){
+    return left1.get_position();
+}
+
+void _leftReset()
+{
+    left1.tare_position();
+    left2.tare_position();
+
+    coastLeft();
+
+
+    leftPos = 0;
+    leftError = 0;
+
+    lastLeftError = 0;
+    leftDeriv = 0;
+    leftIntegral = 0;
+
+    leftPower = 0;
+    slewedLeftPower = 0;
+    lastSlewedLeftPower = 0;
+
+    leftLastDeriv = 0;
+
+    leftSettleTimer = 0;
+    leftExitTimer = 0;
+
+    left(0);
+}
+
+void _rightReset()
+{
+    right1.tare_position();
+    right2.tare_position();
+
+    coastRight();
+
+    rightPos = 0;
+    rightError = 0;
+
+    lastRightError = 0;
+    rightDeriv = 0;
+    rightIntegral = 0;
+
+    rightPower = 0;
+    slewedRightPower = 0;
+    lastSlewedRightPower = 0;
+
+    rightLastDeriv = 0;
+
+    rightSettleTimer = 0;
+    rightExitTimer = 0;
+
+    right(0);
+}
+
+/**************************************************/
+//slew control
+int accel_step = 4; //default acceleration
+int decel_step = 256; // no decel slew
+int accel;
+int decel;
+
+int step;
+int direc;
+
+
+void leftSlew(int pwr){
+    direc = sgn(pwr); //1
+    accel = accel_step; //8
+    decel = decel_step; //-256
+
+    // if(chassisMode == 1 && chassisAccelStep != 0)
+    //     accel = chassisAccelStep;
+    //
+    // if(chassisMode == 2 && chassisAccelStep != 0)
+    //     accel = turnAccelStep;
+
+    if(abs(pwr) > abs(lastSlewedLeftPower)){ // accel
+        if(abs(pwr) > abs(lastSlewedLeftPower) + accel){
+            pwr = lastSlewedLeftPower + accel * direc;
+        }
     }
-    else {
-      if (isTurning) {
-        double turnPos = (getLeftPos() - getRightPos()) / 2;
-        double turnError = turnTarget - turnPos;
-        double turnIntegral = turnIntegral + turnError;
-        if (turnError == 0) {
-          turnIntegral = 0;
-        }
-        double turnDerivative = turnError - turnPreviousError;
-        turnPreviousError = turnError;
-        double turnPower = turnError * tP + turnIntegral * tI + turnDerivative * tD;
-        if (turnPower > maxSpeed) {
-          turnPower = maxSpeed;
-        }
-        else if (turnPower < -maxSpeed) {
-          turnPower = -maxSpeed;
-        }
-        driveSlew(turnPower, -turnPower);
+
+    else  // deccel
+        if(abs(pwr) < abs(lastSlewedLeftPower) - decel)
+            pwr = lastSlewedLeftPower + decel * direc;
+
+    lastSlewedLeftPower = pwr;
+    slewedLeftPower = pwr;
+
+    // if(chassisMode == 4)
+    //     if(!isArcRight)
+    //         slewedLeftPower = slewedLeftPower * arcRatio;
 
 
-      }
-      else {
-        // Left Calc.
-        double leftPos = getLeftPos();
-        double leftError = leftTarget - leftPos;
-        double leftDerivative = leftError - leftPreviousError;
-        double leftIntegral;
-        leftPreviousError = leftError;
-        if (abs(leftError) > 20) {
-          leftIntegral += leftError;
-        }
-        else {
-          leftIntegral = 0;
-        }
-        double leftPower = leftError * dP + leftIntegral * dI + leftDerivative * dD;
-        if (leftPower > 127) {
-          leftPower = 127;
-        }
-        else if (leftPower < -127) {
-          leftPower = -127;
-        }
-        // Right Calc.
 
-        double rightPos = getRightPos();
-        double rightError = rightTarget - rightPos;
-        double rightDerivative = rightError - rightPreviousError;
-        double rightIntegral;
-        rightPreviousError = rightError;
-        if (abs(rightError) > 20) {
-          rightIntegral += rightError;
-        }
-        else {
-          rightIntegral = 0;
-        }
-        double rightPower = rightError * dP + rightIntegral * dI + rightDerivative * dD;
-        if (rightPower > 127) {
-          rightPower = 127;
-        }
-        else if (leftPower < -127) {
-          rightPower = -127;
-        }
+    left(slewedLeftPower);
+}
 
 
-        driveSlew(leftPower, rightPower);
+void rightSlew(int pwr){
+    direc = sgn(pwr);
+    accel = accel_step;
+    decel = decel_step;
 
-      }
+    // if(chassisMode == 1 && chassisAccelStep != 0)
+    //     accel = chassisAccelStep;
+    //
+    // if(chassisMode == 2 && chassisAccelStep != 0)
+    //     accel = turnAccelStep;
+
+    if(abs(pwr) > abs(lastSlewedRightPower)) // accel
+        if(abs(pwr) > abs(lastSlewedRightPower) + accel)
+            pwr = lastSlewedRightPower + accel * direc;
+
+    else  // deccel
+        if(abs(pwr) < abs(lastSlewedRightPower) - decel)
+            pwr = lastSlewedRightPower + decel * direc;
+
+    lastSlewedRightPower = pwr;
+    slewedRightPower = pwr;
+
+    // if(chassisMode == 4)
+    //     if(!isArcRight)
+    //         slewedRightPower = slewedRightPower * arcRatio;
+
+
+
+    right(slewedRightPower);
+}
+
+/**************************************************/
+//slop correction
+void slop(int sp){
+    chassisMode = 2;
+    if(sp < 0){
+        right(-30);
+        pros::delay(100);
+    }
+    chassisMode = 1;
+}
+
+/**************************************************/
+//settling conditions
+
+
+
+bool isRightSettled(){
+
+    if(fabs(rightError) < CHASSIS_ERROR_TRESH[0]){
+        if(fabs(rightError) < CHASSIS_ERROR_TRESH[1]){
+            rightSettleTimer += 20;
+        }
+        else{
+            rightSettleTimer = 0;
+        }
+
+        rightExitTimer += 20;
+
+        if(rightSettleTimer > CHASSIS_TIMEOUT[0])
+            return true;
+        else if(rightExitTimer > CHASSIS_TIMEOUT[1])
+            return true;
+
+        return false;
+    }
+    else
+        rightExitTimer = 0;
+
+    return false;
+}
+
+bool isLeftSettled(){
+
+    if(fabs(leftError) < CHASSIS_ERROR_TRESH[0]){
+        if(fabs(leftError) < CHASSIS_ERROR_TRESH[1]){
+            leftSettleTimer += 20;
+        }
+        else{
+            leftSettleTimer = 0;
+        }
+
+        leftExitTimer += 20;
+
+        if(leftSettleTimer > CHASSIS_TIMEOUT[0])
+            return true;
+        else if(leftExitTimer > CHASSIS_TIMEOUT[1])
+            return true;
+
+        return false;
+    }
+    else
+        leftExitTimer = 0;
+
+    return false;
+}
+
+bool isTurnSettled(){
+
+    if(fabs(turnError) < TURN_ERROR_TRESH[0]){
+        if( fabs(turnError) < TURN_ERROR_TRESH[1] &&
+            turnDeriv < TURN_DERIV_THRESH &&
+            turnLastDeriv < TURN_DERIV_THRESH)
+            return true;
+        else if(turnElapsed > TURN_TIMEOUT)
+            return true;
+
+        turnElapsed += 20;
+        return false;
+    }
+    return false;
+}
+
+void leftWaitUntilSettled(){
+    while(!isLeftSettled()) { pros::delay(20);}
+}
+
+void rightWaitUntilSettled(){
+    while(!isRightSettled()) { pros::delay(20);}
+}
+
+void turnWaitUntilSettled(){
+    while(!isTurnSettled()) { pros::delay(20);}
+}
+
+void chassisWaitUntilSettled(){
+    while(true) {
+        pros::delay(20);
+        switch (chassisMode) {
+            case 1:
+            leftWaitUntilSettled();
+            rightWaitUntilSettled();
+            break;
+
+            case 2:
+            turnWaitUntilSettled();
+            break;
+
+            case 3:
+            leftWaitUntilSettled();
+            rightWaitUntilSettled();
+            break;
+
+            case 4:
+            leftWaitUntilSettled();
+            rightWaitUntilSettled();
+            break;
+    }
+    break;
+}
+
+}
+
+/**************************************************/
+//autonomous functions
+
+void leftMoveAsync(double sp){
+	_leftReset();
+	leftTarget = inchesToTicks(sp);
+}
+
+void leftMove(double sp){
+	leftMoveAsync(sp);
+	leftWaitUntilSettled();
+}
+
+void rightMoveAsync(double sp){
+	_rightReset();
+	rightTarget = inchesToTicks(sp);
+}
+
+void rightMove(double sp){
+	rightMoveAsync(sp);
+	rightWaitUntilSettled();
+}
+
+void moveForwardAsync(double sp){
+    reset();
+    chassisMode = 1;
+    leftMoveAsync(sp);
+    rightMoveAsync(sp);
+}
+
+void moveForward(double sp){
+    moveForwardAsync(sp);
+    chassisWaitUntilSettled();
+}
+
+void moveBackAsync(double sp){
+    moveForwardAsync(-sp);
+}
+
+void moveBack(double sp){
+    chassisMode = 1;
+    _leftReset();
+    _rightReset();
+    moveForward(-sp);
+}
+
+void turnAsync(double degrees){
+    reset();
+    _leftReset();
+    _rightReset();
+    chassisMode = 2;
+	turnTarget = degreesToTicks(degrees);
+}
+
+void turn(double degrees){
+    turnAsync(degrees);
+    chassisWaitUntilSettled();
+}
+
+void pointTurnAsync(bool isRight, double angle){
+    reset();
+    chassisMode = 3;
+    isPointTurnRight = isRight;
+
+    double outerDist = (((2 * PI * WHEELBASE_WIDTH)) * angle) / 360.0;
+
+    if(isRight){
+        lockRight();
+        leftMoveAsync(outerDist);
+    }
+    else{
+        lockLeft();
+        rightMoveAsync(outerDist);
+    }
+}
+
+void pointTurn(bool isRight, double angle){
+    pointTurnAsync(isRight, angle);
+    if(isRight)
+        leftWaitUntilSettled();
+    else
+        rightWaitUntilSettled();
+
+}
+
+void arcTurnAsync(double rad, double angle){
+    reset();
+    chassisMode = 4;
+
+    double radius = abs(rad);
+
+    if(rad > 0) isPointTurnRight = true;
+    else isPointTurnRight = false;
+
+    //arcRatio = radius / (WHEELBASE_WIDTH + radius);
+
+    double innerDist = (2 * PI * radius * angle) / 360.0;
+    double outerDist = (((2 * PI * (radius + WHEELBASE_WIDTH)) * angle) / 360);
+
+    arcRatio = innerDist / outerDist;
+
+    if(isPointTurnRight){
+        leftMoveAsync(outerDist);
+        rightMoveAsync(innerDist);
+    }
+    else{
+        leftMoveAsync(innerDist);
+        rightMoveAsync(outerDist);
+    }
+}
+
+void arcTurn(double rad, double angle){
+    arcTurnAsync(rad,angle);
+    chassisWaitUntilSettled();
+}
+
+
+/**************************************************/
+//misc functions
+void setCurrent(int mA){
+    left1.set_current_limit(mA);
+    left2.set_current_limit(mA);
+    right1.set_current_limit(mA);
+    right2.set_current_limit(mA);
+}
+
+void setBrakeMode(int mode){
+    pros::motor_brake_mode_e_t brakeMode = MOTOR_BRAKE_COAST;
+
+    switch(mode){
+        case 0:
+        brakeMode = MOTOR_BRAKE_COAST;
+        break;
+        case 1:
+        brakeMode = MOTOR_BRAKE_BRAKE;
+        break;
+        case 2:
+        brakeMode = MOTOR_BRAKE_HOLD;
+        break;
+    }
+
+    left1.set_brake_mode(brakeMode);
+    left2.set_brake_mode(brakeMode);
+    right1.set_brake_mode(brakeMode);
+    right2.set_brake_mode(brakeMode);
+}
+
+void chassisArcade(){
+
+    int power = master.get_analog(ANALOG_LEFT_Y);
+    int turn = master.get_analog(ANALOG_RIGHT_X);
+    int leftPower = power - turn;
+    int rightPower = power + turn;
+    left(leftPower);
+    right(rightPower);
+}
+
+int toInt(bool b){
+    if(b) return 1;
+    return 0;
+}
+
+
+void printStats(){
+    if(chassisMode == 1){
+        std::cout << "[" << chassisMode << ", " <<leftTarget << ", " << rightTarget << ", " << leftPos << ", " << rightPos << ", " << leftPower << ", " << rightPower  << "]" << '\n';
 
     }
-    pros::delay(20);
 
-  }
+    pros::lcd::print(0, "turnError: %d\n",  (int)turnError);
+    pros::lcd::print(1, "turnPos: %d\n",  (int)turnPos);
+    pros::lcd::print(2, "rightError: %d\n", (int)rightError);
+    pros::lcd::print(3, "leftError: %d\n", (int)leftError);
+    pros::lcd::print(4, "isRightSettled: %d\n", toInt(isRightSettled()));
+    pros::lcd::print(5, "isLeftSettled: %d\n", toInt(isLeftSettled()));
+
+    pros::lcd::print(6, "slantDiff: %d\n", (int)slantDiff);
+    pros::lcd::print(7, "leftError: %d\n", (int)leftError);
+    //pros::lcd::print(6, "turnError: %d\n", (int)turnError);
 
 }
 
 
-// Drive Modifiers
+/**************************************************/
 
-void setBrakeMode(int modeNumber) {
-  //0 = COAST
-  //1 = BRAKE
-  //2 = HOLD
-  pros::motor_brake_mode_e_t brakeMode;
 
-  switch (modeNumber) {
-    case 0:
-      brakeMode = MOTOR_BRAKE_COAST;
-      break;
-    case 1:
-      brakeMode = MOTOR_BRAKE_BRAKE;
-      break;
-    case 2:
-      brakeMode = MOTOR_BRAKE_HOLD;
-      break;
-  }
-  driveLeftBack.set_brake_mode(brakeMode);
-  driveLeftFront.set_brake_mode(brakeMode);
-  driveRightBack.set_brake_mode(brakeMode);
-  driveRightFront.set_brake_mode(brakeMode);
+//task control
+void chassisTask(void* parameter){
+
+    _leftReset();
+	_rightReset();
+	while (true){
+        //opcontrol
+        // if(!pros::competition::is_autonomous()){
+        //     chassisArcade();
+        // }
+        if(chassisMode == 0){
+            chassisArcade();
+            //printStats();
+        }
+
+        //autonomous control
+        else{
+
+            //forward/backward CHASSIS
+            if(chassisMode == 1){
+
+                P = CHASSIS_KP;
+                I = CHASSIS_KI;
+                I = CHASSIS_KD;
+
+
+                /*
+                LEFT CALCULATIONS
+                */
+
+                leftPos = getLeftPos();
+                leftError = leftTarget - leftPos;
+                leftDeriv = leftError - lastLeftError;
+                lastLeftError = leftError;
+
+
+                //checks if error is within integrating bounds
+                if (abs(leftError) < CHASSIS_UPPER_INTEGRAL_BOUND && abs(leftError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                    leftIntegral += leftError;
+                else
+                    leftIntegral = 0;
+
+                // //caps integral
+                // if (leftIntegral > CHASSIS_INTEGRAL_CAP)
+                //     leftIntegral = CHASSIS_INTEGRAL_CAP;
+                // else if (leftIntegral < -CHASSIS_INTEGRAL_CAP)
+                //     leftIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                //calcs power
+                leftPower = leftError * P + leftIntegral * I + leftDeriv * D;
+
+                //limits to bounds
+                if (leftPower > 127)
+                    leftPower = 127;
+                else if (leftPower < -127)
+                    leftPower = -127;
+
+                /*
+                RIGHT CALCULATIONS
+                */
+
+                rightPos = getRightPos();
+                rightError = rightTarget - rightPos;
+                rightDeriv = rightError - lastRightError;
+                lastRightError = rightError;
+
+
+                //checks if error is within integrating bounds
+                if (abs(rightError) < CHASSIS_UPPER_INTEGRAL_BOUND && abs(rightError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                    rightIntegral += rightError;
+                else
+                    rightIntegral = 0;
+
+                // //caps integral
+                // if (rightIntegral > CHASSIS_INTEGRAL_CAP)
+                //     rightIntegral = CHASSIS_INTEGRAL_CAP;
+                // else if (rightIntegral < -CHASSIS_INTEGRAL_CAP)
+                //     rightIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                //calcs power
+                rightPower = rightError * P + rightIntegral * I + rightDeriv* D;
+
+                //limits to bounds
+                if (rightPower > 127)
+                    rightPower = 127;
+                else if (rightPower < -127)
+                    rightPower = -127;
+
+                /*
+                SLANT CALCULATIONS
+                */
+
+                slantDiff = fabs(leftPos) - fabs(rightPos);
+                slantDeriv = slantDiff - lastSlantDiff;
+                lastSlantDiff = slantDiff;
+
+                slantGains = slantDiff * SLANT_KP + slantDeriv * SLANT_KD;
+
+                if (leftPos > SLANT_THRESH * direc && rightPos > SLANT_THRESH * direc){
+                    leftPower += slantGains;
+                    rightPower -= slantGains;
+                }
+
+
+                //OUTPUT
+
+                if (leftPower > CHASSIS_MAX)
+                    leftPower = CHASSIS_MAX;
+                else if (leftPower < -CHASSIS_MAX)
+                    leftPower = -CHASSIS_MAX;
+
+                if (rightPower > CHASSIS_MAX)
+                    rightPower = CHASSIS_MAX;
+                else if (rightPower < -CHASSIS_MAX)
+                    rightPower = -CHASSIS_MAX;
+
+                leftSlew(leftPower);
+                rightSlew(rightPower);
+
+                std::cout << leftTarget << ", " << rightTarget << ", " << leftError << ", " << rightError << ", " << leftPos << ", " << rightPos << ", " << leftPower << ", " << rightPower << ", " << slewedLeftPower << ", " << slewedRightPower << ", " << lastSlewedLeftPower << ", " << lastSlewedRightPower << '\n';
+
+                printStats();
+            }
+
+            //turn
+            else if(chassisMode == 2){
+                P = TURN_KP;
+                I = TURN_KI;
+                D = TURN_KD;
+
+
+                /*
+                TURN CALCULATIONS
+                */
+
+                turnPos = (-getLeftPos() + getRightPos()) / 2.0;
+                turnError = turnTarget - turnPos;
+                turnDeriv = turnError - lastTurnError;
+                lastTurnError = turnError;
+                leftPos = getLeftPos();
+
+
+                //checks if error is within integrating bounds
+                if (abs(turnError) < TURN_UPPER_INTEGRAL_BOUND || abs(leftError) > TURN_LOWER_INTEGRAL_BOUND)
+                    turnIntegral += turnError;
+                else
+                    turnIntegral = 0;
+
+                //caps integral
+                if (turnIntegral > TURN_INTEGRAL_CAP)
+                    turnIntegral = TURN_INTEGRAL_CAP;
+                else if (turnIntegral < -TURN_INTEGRAL_CAP)
+                    turnIntegral = -TURN_INTEGRAL_CAP;
+
+                //calcs power
+                turnPower = turnError * P + turnIntegral * I + turnDeriv * D;
+
+                //limits to bounds
+                if (turnPower > 127)
+                    turnPower = 127;
+                else if (turnPower < -127)
+                    turnPower = -127;
+
+                leftPower = -turnPower;
+                rightPower = turnPower;
+
+
+                /*
+                SLANT CALCULATIONS
+                */
+
+                slantDiff = fabs(getLeftPos()) + fabs(getRightPos());
+                slantDeriv = slantDiff - lastSlantDiff;
+                lastSlantDiff = slantDiff;
+
+                slantGains = slantDiff * SLANT_TURN_KP + slantDeriv * SLANT_TURN_KD;
+
+                if (turnError > 0){
+                    leftPower -= slantGains;
+                    rightPower += slantGains;
+                }
+                else{
+                    leftPower += slantGains;
+                    rightPower -= slantGains;
+                }
+
+                //OUTPUT
+
+                if (leftPower > TURN_MAX)
+                    leftPower = TURN_MAX;
+                else if (leftPower < -TURN_MAX)
+                    leftPower = -TURN_MAX;
+
+                if (rightPower > TURN_MAX)
+                    rightPower = TURN_MAX;
+                else if (rightPower < -TURN_MAX)
+                    rightPower = -TURN_MAX;
+
+                leftSlew(leftPower);
+                rightSlew(rightPower);
+
+                printStats();
+            }
+
+            //point turn
+            else if(chassisMode == 3){
+                if(isPointTurnRight){
+                    P = CHASSIS_KP;
+                    I = CHASSIS_KI;
+                    I = CHASSIS_KD;
+
+                    /*
+                    LEFT CALCULATIONS
+                    */
+
+                    leftPos = getLeftPos();
+                    leftError = leftTarget - leftPos;
+                    leftDeriv = leftError - lastLeftError;
+                    lastLeftError = leftDeriv;
+
+
+                    //checks if error is within integrating bounds
+                    if (abs(leftError) < CHASSIS_UPPER_INTEGRAL_BOUND || abs(leftError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                        leftIntegral += leftError;
+                    else
+                        leftIntegral = 0;
+
+                    //caps integral
+                    if (leftIntegral > CHASSIS_INTEGRAL_CAP)
+                        leftIntegral = CHASSIS_INTEGRAL_CAP;
+                    else if (leftIntegral < -CHASSIS_INTEGRAL_CAP)
+                        leftIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                    //calcs power
+                    leftPower = leftError * P + leftIntegral * I + leftDeriv * D;
+
+                    //limits to bounds
+                    if (leftPower > 127)
+                        leftPower = 127;
+                    else if (leftPower < -127)
+                        leftPower = -127;
+
+                    //OUTPUT
+
+                    if (leftPower > CHASSIS_MAX)
+                        leftPower = CHASSIS_MAX;
+                    else if (leftPower < -CHASSIS_MAX)
+                        leftPower = -CHASSIS_MAX;
+
+                    leftSlew(leftPower);
+
+                    printStats();
+                }
+                else{
+                    P = TURN_KP;
+                    I = TURN_KI;
+                    I = TURN_KD;
+
+                    /*
+                    RIGHT CALCULATIONS
+                    */
+
+                    rightPos = getRightPos();
+                    rightError = rightTarget - rightPos;
+                    rightDeriv = rightError - lastRightError;
+                    lastRightError = rightDeriv;
+
+
+                    //checks if error is within integrating bounds
+                    if (abs(rightError) < CHASSIS_UPPER_INTEGRAL_BOUND || abs(rightError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                        rightIntegral += rightError;
+                    else
+                        rightIntegral = 0;
+
+                    //caps integral
+                    if (rightIntegral > CHASSIS_INTEGRAL_CAP)
+                        rightIntegral = CHASSIS_INTEGRAL_CAP;
+                    else if (rightIntegral < -CHASSIS_INTEGRAL_CAP)
+                        rightIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                    //calcs power
+                    rightPower = rightError * P + rightIntegral * I + rightDeriv * D;
+
+                    //limits to bounds
+                    if (rightPower > 127)
+                        rightPower = 127;
+                    else if (rightPower < -127)
+                        rightPower = -127;
+
+                    //OUTPUT
+                    if (rightPower > CHASSIS_MAX)
+                        rightPower = CHASSIS_MAX;
+                    else if (rightPower < -CHASSIS_MAX)
+                        rightPower = -CHASSIS_MAX;
+
+                    rightSlew(rightPower);
+
+                    printStats();
+                }
+            }
+
+            //arc turn
+            else if(chassisMode == 4){
+                /*
+                LEFT ARC CALCULATIONS
+                */
+
+                leftPos = getLeftPos();
+                leftError = leftTarget - leftPos;
+                leftDeriv = leftError - lastLeftError;
+                lastLeftError = leftDeriv;
+
+
+                //checks if error is within integrating bounds
+                if (abs(leftError) < CHASSIS_UPPER_INTEGRAL_BOUND || abs(leftError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                    leftIntegral += leftError;
+                else
+                    leftIntegral = 0;
+
+                //caps integral
+                if (leftIntegral > CHASSIS_INTEGRAL_CAP)
+                    leftIntegral = CHASSIS_INTEGRAL_CAP;
+                else if (leftIntegral < -CHASSIS_INTEGRAL_CAP)
+                    leftIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                //calcs power
+                leftPower = leftError * CHASSIS_KP + leftIntegral * CHASSIS_KI + leftDeriv * CHASSIS_KD;
+
+                //limits to bounds
+                if (leftPower > 127)
+                    leftPower = 127;
+                else if (leftPower < -127)
+                    leftPower = -127;
+
+                /*
+                RIGHT ARC CALCULATIONS
+                */
+
+                rightPos = getRightPos();
+                rightError = rightTarget - rightPos;
+                rightDeriv = rightError - lastRightError;
+                lastRightError = rightDeriv;
+
+
+                //checks if error is within integrating bounds
+                if (abs(rightError) < CHASSIS_UPPER_INTEGRAL_BOUND || abs(rightError) > CHASSIS_LOWER_INTEGRAL_BOUND)
+                    rightIntegral += rightError;
+                else
+                    rightIntegral = 0;
+
+                //caps integral
+                if (rightIntegral > CHASSIS_INTEGRAL_CAP)
+                    rightIntegral = CHASSIS_INTEGRAL_CAP;
+                else if (rightIntegral < -CHASSIS_INTEGRAL_CAP)
+                    rightIntegral = -CHASSIS_INTEGRAL_CAP;
+
+                //calcs power
+                rightPower = rightError * CHASSIS_KP + rightIntegral * CHASSIS_KI + rightDeriv * CHASSIS_KD;
+
+                //limits to bounds
+                if (rightPower > 127)
+                    rightPower = 127;
+                else if (rightPower < -127)
+                    rightPower = -127;
+
+                /*
+                LIMITS ARC OUTPUT
+                */
+                if(isArcRight){
+                    if (leftPower > CHASSIS_MAX)
+                        leftPower = CHASSIS_MAX;
+                    else if (leftPower < -CHASSIS_MAX)
+                        leftPower = -CHASSIS_MAX;
+
+                    if (rightPower > CHASSIS_MAX * arcRatio)
+                        rightPower = CHASSIS_MAX * arcRatio;
+                    else if (rightPower < -CHASSIS_MAX * arcRatio)
+                        rightPower = -CHASSIS_MAX * arcRatio;
+                }
+                else{
+                    if (leftPower > CHASSIS_MAX * arcRatio)
+                        leftPower = CHASSIS_MAX * arcRatio;
+                    else if (leftPower < -CHASSIS_MAX * arcRatio)
+                        leftPower = -CHASSIS_MAX * arcRatio;
+
+                    if (rightPower > CHASSIS_MAX)
+                        rightPower = CHASSIS_MAX;
+                    else if (rightPower < -CHASSIS_MAX)
+                        rightPower = -CHASSIS_MAX;
+                }
+
+                //scale power on smaller arcs
+
+                if(isArcRight)
+                    rightPower *= arcRatio;
+                else
+                    leftPower *= arcRatio;
+
+
+                /*
+                SLANT ARC CALCULATIONS
+                */
+
+                if(isArcRight){
+                    slantDiff = fabs(leftPos) - fabs(rightPos) / arcRatio;
+                    slantState = (leftError + rightError / arcRatio) / 2;
+                }
+                else{
+                    slantDiff = fabs(leftPos) / arcRatio - fabs(rightPos);
+                    slantState = (leftError / arcRatio + rightError) / 2;
+                }
+
+                slantDeriv = slantDiff - lastSlantDiff;
+                lastSlantDiff = slantDiff;
+
+                slantGains = slantDiff * ARC_SLANT_KP + slantDeriv * ARC_SLANT_KD;
+
+
+                if (slantState > 0){
+                    leftPower -= slantGains;
+                    rightPower += slantGains;
+                } else{
+                    leftPower += slantGains;
+                    rightPower -= slantGains;
+                }
+
+                if(isArcRight){
+                    rightPower *= arcRatio;
+                } else {
+                    leftPower *= arcRatio;
+                }
+
+
+
+
+                leftSlew(leftPower);
+                rightSlew(rightPower);
+
+            }
+
+        }
+        pros::delay(20);
+    }
 }
