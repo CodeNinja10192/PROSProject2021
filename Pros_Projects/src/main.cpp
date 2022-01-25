@@ -88,6 +88,15 @@ void opcontrol() {
 	*/
 
 	while(true) {
+		if (master.get_digital(DIGITAL_L1)) {
+			intake.move_velocity(200);
+		}
+		else if (master.get_digital(DIGITAL_L2)) {
+			intake.move_velocity(-200);
+		}
+		else {
+			intake.move_velocity(0);
+		}
 		pros::delay(20);
 	}
 }

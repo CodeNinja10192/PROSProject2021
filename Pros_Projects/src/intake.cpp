@@ -57,12 +57,14 @@ void intakePower(int voltage) {
   intake.move_voltage(voltage);
 }
 void intakeOpControl() {
-  if (master.get_digital(DIGITAL_L1)) {
+  if (master.get_digital(DIGITAL_R2)) {
     intakeIn();
   }
+  /* This needs to be adjusted based on available buttons.
   else if (master.get_digital(DIGITAL_L2)) {
     outTake();
   }
+  */
   else {
     intakeStop();
   }

@@ -23,6 +23,7 @@ static double liftDeriv = 0;
 double liftError = 0;
 double liftPos = 0;
 double liftGains = 0;
+double pistonState = true;
 
 int liftMode = 1; //0 is driver, 1 is auton
 
@@ -83,12 +84,16 @@ void liftOp(){
 
 
     //piston
-    if(master.get_digital(DIGITAL_R1)){
-        piston.set_value(true);
+    if(master.get_digital(DIGITAL_R1) && pistonState == true){
+        piston.set_value(pistonState);
+        pistonState = false;
     }
-    else if(master.get_digital(DIGITAL_R2)){
-        piston.set_value(false);
+    else if (master.get_digital(DIGITAL_R1) && pistonState == false) {
+        piston.set_value(pistonState);
+        pistonState = true;
     }
+
+
 
 }
 
